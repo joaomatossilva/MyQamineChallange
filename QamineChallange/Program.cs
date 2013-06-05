@@ -21,7 +21,7 @@ namespace QamineChallange
         {
             var stopwatch = new Stopwatch();
             stopwatch.Start();
-            var challangeString = GetChallangeString();
+            var challangeString = MakeRequest(new Uri(Url, Challenge));
             Console.WriteLine("got challange on {0} mark", stopwatch.Elapsed);
             
             var challange = ParseChallengeData(challangeString);
@@ -29,28 +29,17 @@ namespace QamineChallange
             
             var postData = string.Format("payload={0}&contact={1}&id={2}", challange.Result.ToString(),
                              Uri.EscapeDataString("kappy@acydburne.com.pt"), challange.Id);
+            Console.WriteLine(postData);
             Console.WriteLine("calculates challange on {0} mark", stopwatch.Elapsed);
 
-            var response = SubmitChallange(postData);
+            var response = MakeRequest(new Uri(Url, Answer),
+                               data: postData,
+                               method: "POST",
+                               contentType: "application/x-www-form-urlencoded");
             Console.WriteLine("submitted challenge on {0} mark", stopwatch.Elapsed);
 
             Console.WriteLine(response);
             Console.ReadLine();
-        }
-
-        private static string GetChallangeString()
-        {
-            var request = (HttpWebRequest)WebRequest.Create(new Uri(Url, Challenge));
-            var noCachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.NoCacheNoStore);
-            request.CachePolicy = noCachePolicy;
-            var chanllangeResponse = (HttpWebResponse)request.GetResponse();
-            using (var responseStream = chanllangeResponse.GetResponseStream())
-            {
-                using (var streamReader = new StreamReader(responseStream))
-                {
-                    return streamReader.ReadToEnd();
-                }
-            }
         }
 
         private static ChallengeData ParseChallengeData(string challengeString)
@@ -74,17 +63,21 @@ namespace QamineChallange
             return data;
         }
 
-        private static string SubmitChallange(string postData)
+        private static string MakeRequest(Uri uri, string method = "GET", string data = null, string contentType = null)
         {
-            Console.WriteLine(postData);
-            var request = (HttpWebRequest)WebRequest.Create(new Uri(Url, Answer));
-            request.Method = "POST";
-			request.ContentType = "application/x-www-form-urlencoded";
-            byte[] bytes = Encoding.UTF8.GetBytes(postData);
-			request.ContentLength = bytes.Length;
-			Stream requestStream = request.GetRequestStream();
-			requestStream.Write(bytes, 0, bytes.Length);
-
+            var request = (HttpWebRequest)WebRequest.Create(uri);
+            request.Method = method;
+            if (!string.IsNullOrEmpty(contentType))
+            {
+                request.ContentType = contentType;                
+            }
+            if (!string.IsNullOrEmpty(data))
+            {
+                var bytes = Encoding.UTF8.GetBytes(data);
+                request.ContentLength = bytes.Length;
+                var requestStream = request.GetRequestStream();
+                requestStream.Write(bytes, 0, bytes.Length);   
+            }
 
             var response = (HttpWebResponse)request.GetResponse();
             using (var responseStream = response.GetResponseStream())
