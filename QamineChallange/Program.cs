@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Cache;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -21,16 +22,27 @@ namespace QamineChallange
             var stopwatch = new Stopwatch();
             stopwatch.Start();
             var challangeString = GetChallangeString();
+            Console.WriteLine("got challange on {0} mark", stopwatch.Elapsed);
+            
             var challange = ParseChallengeData(challangeString);
-            var response = GetSubmitChallande(challange);
+            Console.WriteLine("parsed challenge on {0} mark", stopwatch.Elapsed);
+            
+            var postData = string.Format("payload={0}&contact={1}&id={2}", challange.Result.ToString(),
+                             Uri.EscapeDataString("kappy@acydburne.com.pt"), challange.Id.ToString());
+            Console.WriteLine("calculates challange on {0} mark", stopwatch.Elapsed);
+
+            var response = SubmitChallange(postData);
+            Console.WriteLine("submitted challenge on {0} mark", stopwatch.Elapsed);
+
             Console.WriteLine(response);
-            Console.WriteLine(stopwatch.Elapsed);
             Console.ReadLine();
         }
 
         private static string GetChallangeString()
         {
             var request = (HttpWebRequest)WebRequest.Create(new Uri(Url, Challenge));
+            var noCachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.NoCacheNoStore);
+            request.CachePolicy = noCachePolicy;
             var chanllangeResponse = (HttpWebResponse)request.GetResponse();
             using (var responseStream = chanllangeResponse.GetResponseStream())
             {
@@ -43,44 +55,27 @@ namespace QamineChallange
 
         private static ChallengeData ParseChallengeData(string challengeString)
         {
-            var startIndex = challengeString.IndexOf("<pre>") + 5;
-            var endIndex = challengeString.IndexOf("\n", startIndex);
-            var preString = challengeString.Substring(startIndex, endIndex - startIndex);
-
-            Console.WriteLine(preString);
             var data = new ChallengeData();
+            const string rx = @"^If you could just (\bsubtract|add|multiply|divide\b) (\d+) (\bby|to|times\b) (\d+) that would be great..Your Id is also (\d+)";
 
-            if (preString.Contains("just subtract"))
+            Console.WriteLine(challengeString);
+            var match = Regex.Match(challengeString, rx);
+            if (match.Success)
             {
-                data.Operator = ChallengeOperation.Subtract;
-            } else if (preString.Contains("just add"))
-            {
-                data.Operator = ChallengeOperation.Add;
+                data.Operator = match.Groups[1].Value;
+                data.Value1 = Convert.ToInt32(match.Groups[2].Value);
+                data.Value2 = Convert.ToInt32(match.Groups[4].Value);
+                data.Id = Convert.ToInt64(match.Groups[5].Value);
             }
             else
             {
-                throw  new Exception("Invalid operator: " + preString);
+                throw new Exception("Invalid matches count");
             }
-
-            var matches = Regex.Matches(preString, @"\d+");
-            if (matches.Count == 3)
-            {
-                data.Value1 = Convert.ToInt32(matches[0].Value);
-                data.Value2 = Convert.ToInt32(matches[1].Value);
-                data.Id = Convert.ToInt64(matches[2].Value);
-            }
-            else
-            {
-                throw new Exception("Invalid maches count");
-            }
-
             return data;
         }
 
-        private static string GetSubmitChallande(ChallengeData data)
+        private static string SubmitChallange(string postData)
         {
-            var postData = string.Format("payload={0}&contact={1}&id={2}", data.Calculate().ToString(),
-                                         Uri.EscapeDataString("kappy@acydburne.com.pt"), data.Id.ToString());
             Console.WriteLine(postData);
             var request = (HttpWebRequest)WebRequest.Create(new Uri(Url, Answer));
             request.Method = "POST";
@@ -107,25 +102,22 @@ namespace QamineChallange
         public long Id { get; set; }
         public int Value1 { get; set; }
         public int Value2 { get; set; }
-        public ChallengeOperation Operator { get; set; }
+        public string Operator { get; set; }
 
-        public int Calculate()
+        public int Result
         {
-            if (Operator == ChallengeOperation.Add)
+            get
             {
-                return Value1 + Value2;
+                return Operators[Operator](Value1, Value2);
             }
-            if (Operator == ChallengeOperation.Subtract)
-            {
-                return Value2 - Value1;
-            }
-            throw new Exception("Invalid operation on calculation");
         }
-    }
 
-    public enum ChallengeOperation
-    {
-        Subtract,
-        Add
-    };
+        private static readonly IDictionary<string, Func<int, int, int>> Operators = new Dictionary<string, Func<int, int, int>>
+        {
+            {"add", (i1, i2) => i1 + i2},
+            {"subtract", (i1, i2) => i2 - i1},
+            {"multiply", (i1, i2) => i1 * i2},
+            {"divide", (i1, i2) => i1 / i2}
+        };
+    }
 }
