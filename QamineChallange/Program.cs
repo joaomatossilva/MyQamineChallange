@@ -12,7 +12,7 @@ namespace QamineChallange
 {
     class Program
     {
-        private static readonly Uri Url = new Uri("http://engineer.qamine.com");
+        private static readonly Uri Url = new Uri("http://powerful-fortress-5090.appspot.com");
         private const string Challenge = "challenge";
         private const string Answer = "answer";
 
@@ -28,7 +28,7 @@ namespace QamineChallange
             Console.WriteLine("parsed challenge on {0} mark", stopwatch.Elapsed);
             
             var postData = string.Format("payload={0}&contact={1}&id={2}", challange.Result.ToString(),
-                             Uri.EscapeDataString("kappy@acydburne.com.pt"), challange.Id.ToString());
+                             Uri.EscapeDataString("kappy@acydburne.com.pt"), challange.Id);
             Console.WriteLine("calculates challange on {0} mark", stopwatch.Elapsed);
 
             var response = SubmitChallange(postData);
@@ -56,7 +56,7 @@ namespace QamineChallange
         private static ChallengeData ParseChallengeData(string challengeString)
         {
             var data = new ChallengeData();
-            const string rx = @"^If you could just (\bsubtract|add|multiply|divide\b) (\d+) (\bby|to|times\b) (\d+) that would be great..Your Id is also (\d+)";
+            const string rx = @"^If you could just (\bsubtract|add|multiply|divide\b) (\d+) (\bby|to|times\b) (\d+) that would be great..Your Id is also ([0-9a-fA-F]+)";
 
             Console.WriteLine(challengeString);
             var match = Regex.Match(challengeString, rx);
@@ -65,7 +65,7 @@ namespace QamineChallange
                 data.Operator = match.Groups[1].Value;
                 data.Value1 = Convert.ToInt32(match.Groups[2].Value);
                 data.Value2 = Convert.ToInt32(match.Groups[4].Value);
-                data.Id = Convert.ToInt64(match.Groups[5].Value);
+                data.Id = match.Groups[5].Value;
             }
             else
             {
@@ -99,7 +99,7 @@ namespace QamineChallange
 
     public class ChallengeData
     {
-        public long Id { get; set; }
+        public string Id { get; set; }
         public int Value1 { get; set; }
         public int Value2 { get; set; }
         public string Operator { get; set; }
